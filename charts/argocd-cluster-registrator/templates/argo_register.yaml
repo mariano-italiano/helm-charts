@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: argocd-cluster-registrator
+spec:
+  schedule: "* * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: registrator
+            image: docker-hub-proxy.solvinity.net/bitnami/kubectl
+            command: ["/bin/bash","-c"]
+            args: ["/script/cluster_register.sh; /script/cluster_deregister.sh;"]
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              seccompProfile:
+                type: RuntimeDefault
+              capabilities:
+                drop:
+                - ALL
+            volumeMounts:
+            - name: registration-scripts
+              mountPath: "/script"
+            - name: cluster-secret-template
+              mountPath: "/template"
+            env:
+            - name: ARGOCD_RANCHER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: argocd-cluster-registrator-secret
+                  key: argocd-global-token
+            - name: ARGOCD_RANCHER_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: argocd-cluster-registrator-secret
+                  key: argocd-rancher-mgmt-hostname
+          serviceAccountName: argocd-cluster-registrator-sa
+          volumes:
+          - name: registration-scripts
+            configMap:
+              name: argocd-cluster-registrator-script-cm
+              defaultMode: 0555
+              items:
+              - key: cluster_register.sh
+                path: cluster_register.sh
+              - key: cluster_deregister.sh
+                path: cluster_deregister.sh
+          - name: cluster-secret-template
+            configMap:
+              name: argocd-cluster-registrator-template-cm
+              defaultMode: 0444
+              items:
+              - key: cluster-secret-template.yaml
+                path: cluster-secret-template.yaml

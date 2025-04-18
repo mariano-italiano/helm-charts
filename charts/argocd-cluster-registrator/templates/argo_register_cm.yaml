@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cluster-registrator-script-cm
+data:
+  cluster_register.sh: |
+    #!/bin/bash
+
+    for cluster_name in `kubectl get cluster.provisioning.cattle.io -n fleet-default -o yaml | yq .items[].metadata.name`; do
+      echo "Registering cluster $cluster_name"
+
+      # Checking if cluster is in ready state
+      kubectl get cluster.provisioning.cattle.io -n fleet-default -o yaml ${cluster_name} | yq -e .status.ready
+      if [[ $? -ne 0 ]]; then
+        echo "Cluster $cluster_name is not ready. Please check rancher cluster status"
+        continue
+      fi
+      export cluster_friendly_name=$cluster_name
+      export cluster_id=`kubectl get cluster.provisioning.cattle.io -n fleet-default -o yaml ${cluster_name} | yq .status.clusterName`
+      cat /template/cluster-secret-template.yaml | sed 's/<<RANCHER_MGMT_HOST>>/'"$ARGOCD_RANCHER_HOST"'/g' | sed 's/<<CLUSTER_TOKEN>>/'"$ARGOCD_RANCHER_TOKEN"'/g' | sed 's/<<CLUSTER_NAME>>/'"$cluster_friendly_name"'/g' | sed 's/<<CLUSTER_ID>>/'"$cluster_id"'/g' > /tmp/${cluster_name}_secret.yaml
+      
+      kubectl apply -f /tmp/${cluster_name}_secret.yaml
+    done
+  cluster_deregister.sh: |
+    #!/bin/bash
+
+    for cluster_name in `kubectl get secret -n argocd -l 'argocd.argoproj.io/secret-type=cluster,env!=management' -o yaml | yq '.items[].data.name | @base64d'`; do
+      echo "Checking if cluster $cluster_name can be deregistered"
+      
+      kubectl get cluster.provisioning.cattle.io -n fleet-default $cluster_name
+      if [[ $? -ne 0 ]]; then
+        echo "Cluster $cluster_name is no longer available. Deleting..."
+        kubectl delete secret -n argocd $cluster_name
+      fi
+    done

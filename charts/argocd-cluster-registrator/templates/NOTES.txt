@@ -1,0 +1,9 @@
+
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+Tags applied during cluster registration:
+  {{- range $key, $value := $.Values.tags }}
+    - {{ $key }}: {{ toYaml $value }}
+  {{- end }}

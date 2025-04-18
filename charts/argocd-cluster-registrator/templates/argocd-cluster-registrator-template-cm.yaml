@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cluster-registrator-template-cm
+data:
+  cluster-secret-template.yaml: |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: <<CLUSTER_NAME>>
+      namespace: argocd
+      labels:
+      {{- range $key, $value := $.Values.tags }}
+        {{ $key }}: {{ toYaml $value }}
+      {{- end }}
+    type: Opaque
+    stringData:
+      name: <<CLUSTER_NAME>>
+      server: https://<<RANCHER_MGMT_HOST>>/k8s/clusters/<<CLUSTER_ID>>
+      config: |
+        {
+          "bearerToken": "<<CLUSTER_TOKEN>>",
+          "tlsClientConfig": {
+            "insecure": false
+          }
+        }

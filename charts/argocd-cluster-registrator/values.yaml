@@ -1,0 +1,11 @@
+# Default values for argocd-cluster-registrator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Tags to specify for cluster registration.
+#tags: []
+tags:
+  argocd.argoproj.io/secret-type: cluster
+  env: test
+  tenant: test2
+
